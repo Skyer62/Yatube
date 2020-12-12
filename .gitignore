@@ -29,5 +29,5 @@ htmlcov/
 coverage.xml
 *.cover
 
-.media
-.media/
+media
+media/
