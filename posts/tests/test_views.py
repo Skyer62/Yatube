@@ -12,7 +12,7 @@ class TaskPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        User.objects.create(
+        cls.user = User.objects.create(
             username='VVV',
             email='vv@mail.ru',
             password='123',
@@ -32,7 +32,7 @@ class TaskPagesTests(TestCase):
             slug='cat',
             description='Test description',
         )
-        Group.objects.create(
+        cls.group = Group.objects.create(
             title='dog',
             slug='dog',
             description='Test description',
@@ -57,9 +57,7 @@ class TaskPagesTests(TestCase):
                 group=Group.objects.get(title='cat'),
                 image=image,
             )
-        cls.post = Post.objects.get(id=1)
-        cls.group = Group.objects.get(id=1)
-        cls.user = User.objects.get(id=1)
+        cls.post = Post.objects.first()
 
     def setUp(self):
         self.flat_about = FlatPage.objects.create(
@@ -113,6 +111,7 @@ class TaskPagesTests(TestCase):
                 response = self.authorized_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
+    # Тест загрузки картинки
     def test_index_page_and_post_group_show_correct_context(self):
         '''Шаблон index сформирован с правильным контекстом. Новый пост
         появляется на главной странице. Паджинатор помещает правильное кол-во
@@ -127,9 +126,10 @@ class TaskPagesTests(TestCase):
         self.assertEqual(post.author, self.user)
         self.assertEqual(len(response.context['page']), 10)
 
+    # Тест загрузки картинки
     def test_group_pages_show_correct_context(self):
         '''Шаблон group сформирован с правильным контекстом. Новый пост
-        появляется на странице выбранной группы'''
+        появляется на странице выбранной группы. Картинка отображается в группе'''
         image = self.image
         response = self.authorized_client.get(
             reverse('group', kwargs={'slug': 'cat'})
@@ -268,13 +268,32 @@ class TaskPagesTests(TestCase):
             'post': self.post
         }
         response = self.authorized_client.post(
-            reverse('add_comment', kwargs={'username': 'SSS', 'post_id': '1'}),
+            reverse('add_comment', kwargs={'username': 'VVV', 'post_id': '1'}),
             data=form_data,
-            follow=True
+            follow=False
         )
-        comment = response.context['comments'][0]
+        comment = Comment.objects.first()
         self.assertEqual(comment.text, form_data['text'])
         self.assertEqual(Comment.objects.count(), comments_count + 1)
         self.assertRedirects(response, reverse(
             'post', kwargs={'username': comment.author,
-                            'post_id': form_data['post'].id}))
+                            'post_id': '1'}))
+
+    def test_guest_not_have_rules_on_comments(self):
+        '''Гость не может оставлять комментарии к постам'''
+        form_data = {
+            'text': 'Коммент',
+            'post': self.post
+        }
+        self.authorized_client.post(
+            reverse('add_comment', kwargs={'username': 'SSS', 'post_id': '1'}),
+            data=form_data,
+            follow=True
+        )
+        comments_count = Comment.objects.count()
+        self.guest_client.post(
+            reverse('add_comment', kwargs={'username': 'SSS', 'post_id': '1'}),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(Comment.objects.count(), comments_count)
